@@ -1,4 +1,6 @@
 # everything in here is stocastic and subject to change
+if you need to get in: 520-548-3353
+
 Things we have done so far:
     Gained understanding of system requirements and existing implementation.
 
@@ -19,17 +21,11 @@ Things we have done so far:
 12/5/11  -- today
     get keys
 
-    fix networking -- done
-
     run git daemon on Think
 
     read from cameras (and into pipeline)
 
-    install new sdk
-
-    install libzmq
-
-    python 2.7, ipython, pyzmq, boost?, opencv, py-opencv, TBB (for opencv;
+    opencv, py-opencv, TBB (for opencv;
     look into IPP license from AME folks)
 
     benchmark both cameras at the same time to see how fast the pipeline needs
@@ -38,6 +34,14 @@ Things we have done so far:
     build pipeline speed monitor
 
     implement disk dump and disk read for pictures
+
+    python 2.7, ipython, pyzmq, boost?,  -- done
+    
+    fix networking -- done
+
+    install new sdk -- done
+
+    install libzmq -- done
 
 12/9/11   -- start of finals
 12/15/11 -- start of winter break
