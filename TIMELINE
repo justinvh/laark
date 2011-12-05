@@ -19,9 +19,9 @@ Things we have done so far:
 12/5/11  -- today
     get keys
 
-    fix networking
+    fix networking -- done
 
-    install git on Think
+    run git daemon on Think
 
     read from cameras (and into pipeline)
 
