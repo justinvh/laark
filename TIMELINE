@@ -1,0 +1,84 @@
+# everything in here is stocastic and subject to change
+Things we have done so far:
+    Gained understanding of system requirements and existing implementation.
+
+    Installed Arch Linux in on the LAARK hardware for low overhead, easy
+    administration, straight forward init scripts and generally being nice to use.
+
+    Decided on pipeline architecture based on small single-purpose scripts running
+    as concurrent processes. They will communicate using ZeroMQ and will be written
+    in Python, C++, and C as is appropriate for the task (favoring Python). This
+    will be a great aid in maintenance, reliability, tuning, and testing. It also
+    keeps the system modular and deterministic which will be well suited for small
+    team to work on and future teams to understand and inherit.
+
+    It will be licenced under the BSD License.
+
+    The git version control system will be used to organize the code.
+
+12/5/11  -- today
+    get keys
+
+    fix networking
+
+    install git on Think
+
+    read from cameras (and into pipeline)
+
+    install new sdk
+
+    install libzmq
+
+    python 2.7, ipython, pyzmq, boost?, opencv, py-opencv, TBB (for opencv;
+    look into IPP license from AME folks)
+
+    benchmark both cameras at the same time to see how fast the pipeline needs
+    to be
+
+    build pipeline speed monitor
+
+    implement disk dump and disk read for pictures
+
+12/9/11   -- start of finals
+12/15/11 -- start of winter break
+1/11/12   -- start of spring semester
+1/16/12   -- first Monday
+    distortion correction
+
+    keystone correction
+
+    barrel/pincushion correction
+
+    crude vision analysis module and testing
+
+1/23/12 
+    better vision
+
+    set up reliable networking connection between plane and ground-station
+
+1/30/12
+    better vision
+
+    start flight testing
+
+2/6/12 
+refine
+
+2/13/12
+refine
+
+2/20/12
+refine
+
+2/27/12
+refine
+
+3/5/12
+refine
+
+3/10/12   -- start of spring break
+3/19/12
+3/26/12
+...
+5/4/12     -- start of finals
+5/10/12   -- end of spring semester
