@@ -1,7 +1,7 @@
 '''
 pipeclock --
 Reads from a pull socket and times how long each request takes. 
-It does not process the messagse it receives.
+It does not process the messages it receives.
 '''
 
 import argparse
