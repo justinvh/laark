@@ -18,22 +18,17 @@ Things we have done so far:
 
     The git version control system will be used to organize the code.
 
-12/5/11  -- today
-    get keys
-
-    run git daemon on Think
-
-    read from cameras (and into pipeline)
-
-    opencv, py-opencv, TBB (for opencv;
-    look into IPP license from AME folks)
+12/5/11
+    read from cameras (and into pipeline) -- Justin
 
     benchmark both cameras at the same time to see how fast the pipeline needs
-    to be
+    to be -- Justin
 
-    build pipeline speed monitor
+    opencv, py-opencv, TBB (for opencv; look into IPP license from AME folks) -- Chris
 
-    implement disk dump and disk read for pictures
+    implement disk dump and disk read for pictures -- Chas (waiting on opencv install)
+
+    build pipeline speed monitor -- done
 
     python 2.7, ipython, pyzmq, boost?,  -- done
     
@@ -44,6 +39,8 @@ Things we have done so far:
     install libzmq -- done
 
 12/9/11   -- start of finals
+    get keys
+
 12/15/11 -- start of winter break
 1/11/12   -- start of spring semester
 1/16/12   -- first Monday
