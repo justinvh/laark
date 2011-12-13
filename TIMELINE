@@ -22,9 +22,6 @@ Things we have done so far:
     The git version control system will be used to organize the code. It is
     currently on github at https://github.com/laark/laark
 
-    You currently need to add /usr/local/lib/ to your LD_LIBRARY_PATH to access
-    libzmq.
-
     We are discussing all development in https://xorse.campfirenow.com/room/457281
     so they can be logged and easy to access.
 
