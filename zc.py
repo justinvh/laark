@@ -8,7 +8,7 @@ environmental variable PORT
 import argparse
 import os
 import sys
-import zmq
+from pipeline import pipeline
 
 parser = argparse.ArgumentParser(
     description='Read from stdin and send contents to a ZMQ socket')
@@ -19,14 +19,12 @@ parser.add_argument('--port', dest='port', type=int, nargs='?',
 
 args = parser.parse_args()
 
-context = zmq.Context()
-sender = context.socket(zmq.PUSH)
-sender.bind("tcp://*:%d" % args.port)
-
-while True:
+@pipeline(out_port=args.port)
+def read():
     try:
-        sender.send(raw_input())
+        return raw_input()
     except EOFError:
         sys.exit(0)
     
+read.run()
 
