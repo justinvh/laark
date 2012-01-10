@@ -1,19 +1,25 @@
 #include <iostream>
+#include <cstring>
+#include <fstream>
 #include <cstdlib>
-#include <uEye.h>
 #include <ueye.h>
+#include <zmq.hpp>
+#include <unistd.h>
 
 using namespace std;
 
+int FORMAT = 9;
+
 int main(int argc, char** argv)
 {
-    if (argc != 3) {
-        cerr << "save_image <camera_id> <path>" << endl;
+    if (argc != 2) {
+        cerr << "save_image <camera_id>" << endl;
         return -1;
     }
 
     HIDS camera_id = atoi(argv[1]);
-    const char* path = argv[2];
+
+    std::cout << "Initializing camera: " << camera_id << std::endl;
 
     INT status = is_InitCamera(&camera_id, NULL);
     if (status != IS_SUCCESS) {
@@ -23,15 +29,56 @@ int main(int argc, char** argv)
 
     cout << "Camera ID: " << camera_id << endl;
 
-    // is_EnableAutoExit(camera_id, IS_ENABLE_AUTO_EXIT);
+    //  Prepare our context and socket
+    cout << "Preparing ZMQ" << endl;
+    zmq::context_t context (1);
+    zmq::socket_t socket (context, ZMQ_REP);
+    socket.bind ("tcp://*:5555");
+    
+    // Get number of available formats and size of list
+    UINT count;
+    UINT bytesNeeded = sizeof(IMAGE_FORMAT_LIST);
+    INT nRet = is_ImageFormat(camera_id, IMGFRMT_CMD_GET_NUM_ENTRIES, &count, 4);
+    bytesNeeded += (count - 1) * sizeof(IMAGE_FORMAT_INFO);
+    void* ptr = malloc(bytesNeeded);
+     
+    // Create and fill list
+    IMAGE_FORMAT_LIST* pformatList = (IMAGE_FORMAT_LIST*) ptr;
+    pformatList->nSizeOfListEntry = sizeof(IMAGE_FORMAT_INFO);
+    pformatList->nNumListElements = count;
+    nRet = is_ImageFormat(camera_id, IMGFRMT_CMD_GET_LIST, pformatList, bytesNeeded);
+     
+    // Activate trigger mode for capturing high resolution images (USB uEye XS)
+    nRet = is_StopLiveVideo(camera_id, IS_WAIT);
+    nRet = is_SetExternalTrigger(camera_id, IS_SET_TRIGGER_SOFTWARE);
+
+    IMAGE_FORMAT_INFO formatInfo;
+    for (UINT i = 0; i < count; i++) {
+        if (pformatList->FormatInfo[i].nFormatID == FORMAT) {
+            formatInfo = pformatList->FormatInfo[i];
+            break;
+        }
+    }
+
+    if (is_ImageFormat(camera_id, IMGFRMT_CMD_SET_FORMAT, &formatInfo.nFormatID, 4) != IS_SUCCESS) {
+        char* ptr;
+        is_GetError(camera_id, NULL, &ptr);
+        cerr << "Error in setting display mode." << endl;
+        cerr << ptr << endl;
+        return -1;
+    }
 
     int mem_id;
     char* mem;
 
-    INT size_x = 3840;
-    INT size_y = 2748;
+    INT size_x = formatInfo.nWidth;
+    INT size_y = formatInfo.nHeight;
+    INT depth = 24;
+    int send_size = size_x * size_y * depth;
 
-    if (is_AllocImageMem(camera_id, size_x, size_y, 32, &mem, &mem_id)
+    std::cout << "Camera is operating at " << formatInfo.strFormatName << std::endl;
+
+    if (is_AllocImageMem(camera_id, size_x, size_y, depth, &mem, &mem_id)
             != IS_SUCCESS) {
         cerr << "Error in allocating image memory." << endl;
         return -1;
@@ -42,44 +89,37 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if (is_SetColorMode(camera_id, IS_SET_CM_RGB32) != IS_SUCCESS) {
-        cerr << "Failed to set color mode." << endl;
-        return -1;
-    }
+    std::cout << "Preparing for data" << std::endl;
+    while (true) {
+        zmq::message_t request;
+        //  Wait for next request from client
+        std::cout << "====== Waiting for command =====" << std::endl;
+        socket.recv (&request);
+        char* data = (char*)request.data();
+        data[request.size()] = '\0';
+        std::cout << "Received Command: " << data << std::endl;
+        if (strcmp(data, "snap") == 0) {
+            std::cout << "======= Client wants to snap ======" << std::endl;
+            zmq::message_t reply (send_size);
 
-    if (is_SetPixelClock(camera_id, 15) != IS_SUCCESS) {
-        char* ptr;
-        is_GetError(camera_id, NULL, &ptr);
-        cerr << "Error in setting pixel clock." << endl;
-        cerr << ptr << endl;
-        return -1;
-    }
+            std::cout << "Freezing frame" << std::endl;
+            if (is_FreezeVideo(camera_id, IS_WAIT) != IS_SUCCESS) {
+                cerr << "Error in freezing a frame." << endl;
+                return -1;
+            }
 
-    if (is_SetDisplayMode(camera_id, IS_SET_DM_DIB) != IS_SUCCESS) {
-        INT mode = is_SetDisplayMode(camera_id, IS_GET_DISPLAY_MODE);
-        if (mode != IS_SET_DM_DIB) {
-            char* ptr;
-            is_GetError(camera_id, NULL, &ptr);
-            cerr << "Error in setting display mode." << endl;
-            cerr << ptr << endl;
-            cerr << mode << endl;
+            //  Send reply back to client
+            std::cout << "Saving image to data" << std::endl;
+            is_CopyImageMem(camera_id, mem, mem_id, (char*)reply.data());
+
+            socket.send (reply);
+            std::cout << "Data sent: " << send_size << std::endl;
+        } else if (strcmp(data, "exit") == 0) {
+            break;
+        } else {
+            std::cout << "Unknown command: " << data << std::endl;
         }
     }
-
-    is_SetExternalTrigger(camera_id, IS_SET_TRIGGER_SOFTWARE);
-     
-    if (is_FreezeVideo(camera_id, IS_WAIT) != IS_SUCCESS) {
-        cerr << "Error in freezing a frame." << endl;
-        return -1;
-    }
-
-    if (is_SaveImageMemEx(camera_id, path, mem, mem_id, IS_IMG_BMP, 75) != IS_SUCCESS) {
-        cerr << "Error in saving frame. " << endl;
-        return -1;
-    }
-
-    is_CameraStatus(camera_id, IS_LAST_CAPTURE_ERROR, IS_GET_STATUS);
-
     is_FreeImageMem(camera_id, mem, mem_id);
     is_ExitCamera(camera_id);
 
