@@ -7,30 +7,27 @@ It does not process the messages it receives.
 import argparse
 import os
 import time
-import zmq
+from pipeline import pipeline
 
 parser = argparse.ArgumentParser(
-    description='Reads from a pull socket and prints out the message number, '
-                'the time that it received thes message, and how long it '
+    description='Reads from pull socket(s) and prints out the message number, '
+                'the time that it received the message, and how long it '
                 'took to receive it.')
 
-parser.add_argument('--port', dest='port', type=int, nargs='?',
-                    default=int(os.environ.get('PORT', 5558)),
-                    help='the port that pipeclock will pull from')
+parser.add_argument('--in-ports', dest='in_ports', type=int, nargs='+',
+                    default=[5999],
+                    help='the ports that pipeclock will pull from')
 
 args = parser.parse_args()
 
-context = zmq.Context()
-receiver = context.socket(zmq.PULL)
-receiver.connect("tcp://localhost:%d" % args.port)
-
 n = 0
 start = last = time.time()
-while True:
-    receiver.recv()
+@pipeline(in_ports=args.in_ports)
+def timer(_):
+    global start, last, n
     current = time.time()
     print "%d %f %f" % (n, current-start, current-last)
     last = current
     n += 1
 
-
+timer.run()

@@ -24,6 +24,9 @@ sender = context.socket(zmq.PUSH)
 sender.bind("tcp://*:%d" % args.port)
 
 while True:
-    sender.send(sys.stdin.read())
+    try:
+        sender.send(raw_input())
+    except EOFError:
+        sys.exit(0)
     
 

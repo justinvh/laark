@@ -7,6 +7,9 @@ Things we have done so far:
     Installed Arch Linux in on the LAARK hardware for low overhead, easy
     administration, straight forward init scripts and generally being nice to use.
 
+    Uninstalled Arch Linux and decided to use Debian instead because the uEye
+    daemon has Sys-V init script assumptions hardcoded in.
+
     Decided on pipeline architecture based on small single-purpose scripts running
     as concurrent processes. They will communicate using ZeroMQ and will be written
     in Python, C++, and C as is appropriate for the task (favoring Python). This
@@ -16,7 +19,11 @@ Things we have done so far:
 
     It will be licenced under the BSD License.
 
-    The git version control system will be used to organize the code.
+    The git version control system will be used to organize the code. It is
+    currently on github at https://github.com/laark/laark
+
+    We are discussing all development in https://xorse.campfirenow.com/room/457281
+    so they can be logged and easy to access.
 
 12/5/11
     read from cameras (and into pipeline) -- Justin
