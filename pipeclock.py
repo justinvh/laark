@@ -16,18 +16,37 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('--in-ports', dest='in_ports', type=int, nargs='+',
                     default=[5999],
-                    help='the ports that pipeclock will pull from')
+                    help='The ports that pipeclock will pull from.')
+
+parser.add_argument('--out-port', dest='out_port', type=int, nargs='?',
+                    default=6000,
+                    help='The port that pipeclock will forward data to.')
+
+parser.add_argument('--forward', dest='forward', type=bool, nargs='?',
+                    default=False,
+                    help='Whether data should be forwarded.')
 
 args = parser.parse_args()
 
 n = 0
 start = last = time.time()
-@pipeline(in_ports=args.in_ports)
-def timer(_):
+def timer(data=None):
     global start, last, n
     current = time.time()
     print "%d %f %f" % (n, current-start, current-last)
     last = current
     n += 1
+    return data
 
-timer.run()
+@pipeline(in_ports=args.in_ports, out_port=args.out_port)
+def timer_forward(data):
+    return timer(data)
+
+@pipeline(in_ports=args.in_ports)
+def timer_no_forward(_):
+    timer()
+
+if args.forward:
+    timer_forward.run()
+else:
+    timer_no_forward.run()
