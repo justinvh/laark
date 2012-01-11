@@ -1,12 +1,15 @@
-CXX=g++
-CXXFLAGS+=-I/usr/include -I/usr/local/include -Wall -Werror -pedantic -O2
-LDFLAGS+=-lrt -lzmq -lboost_program_options -lueye_api
+BASECFLAGS=-O2 -pedantic -Wall -Werror
+CFLAGS+=$(BASECFLAGS) -std=c99
+CXXFLAGS+=$(BASECFLAGS)
+LDFLAGS+=-lzmq -lboost_program_options -lueye_api -lm
 
-all: bench test detect save_image
+PRG=$(patsubst %.cc,%,$(wildcard *.cc))
+PRG+=$(patsubst %.c,%,$(wildcard *.c))
+
+all: $(PRG)
 
 clean:
-	find . -maxdepth 1 -type f -perm -+x ! -name '*.*' | xargs rm -f
-	rm -f *.o
+	rm -f *.o $(PRG)
 
 .PHONY: clean
 
