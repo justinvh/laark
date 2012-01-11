@@ -44,6 +44,7 @@ public:
     UINT format_count;
     IMAGE_FORMAT_LIST* resolutions;
     bool connected;
+    int device_id;
 
     Camera() : snap_buffer(0), handle(0), resolutions(0), connected(false)
     {
@@ -57,6 +58,7 @@ public:
 
     void create(const int device_id)
     {
+        this->device_id = device_id;
         handle = device_id;
         handle |= IS_USE_DEVICE_ID;
         if (is_InitCamera(&handle, NULL) != IS_SUCCESS) {
@@ -174,19 +176,19 @@ public:
         debug << "Allocation size: " << cam_size << endl;
 
         if (snap_buffer) {
-            debug << "Freeing memory for camera." << endl;
+            debug << "Freeing memory for camera on " << device_id  << endl;
             is_FreeImageMem(handle, snap_buffer, buffer_id);
         }
 
         if (is_AllocImageMem(handle, width, height, depth, &snap_buffer, &buffer_id)
                 != IS_SUCCESS) {
-            cerr << "Error in allocating image memory." << endl;
+            cerr << "Error in allocating image memory on " << device_id  << endl;
             return false;
         }
 
         debug << "Setting memory for camera" << endl;
         if (is_SetImageMem(handle, snap_buffer, buffer_id) != IS_SUCCESS) {
-            cerr << "Error in setting image memory." << endl;
+            cerr << "Error in setting image memory on " << device_id  << endl;
             return false;
         }
         debug << "Memory set." << endl;
@@ -199,13 +201,13 @@ public:
         zmq::message_t message(cam_size);
 
         if (is_FreezeVideo(handle, IS_WAIT) != IS_SUCCESS) {
-            cerr << "Error in freezing a frame." << endl;
+            cerr << "Error in freezing a frame on " << device_id << endl;
             return false;
         }
 
         is_CopyImageMem(handle, snap_buffer, buffer_id, (char*)message.data());
         socket->send(message);
-        debug << "[" << ++message_count << "] Message sent (" << cam_size << ")" << endl;
+        debug << "[" << ++message_count << "] Message sent (" << cam_size << ") on " << device_id << endl;
         return true;
     }
 };
