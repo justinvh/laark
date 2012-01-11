@@ -131,7 +131,7 @@ public:
     {
         if (!refresh_formats_available()) {
             cerr << "Camera image formats could not be generated." << endl;
-            return -1;
+            return false;
         }
 
         debug << "Resolution mode: " << mode << endl;
