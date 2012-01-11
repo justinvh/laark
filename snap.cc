@@ -45,6 +45,11 @@ public:
     IMAGE_FORMAT_LIST* resolutions;
     bool connected;
 
+    Camera() : snap_buffer(0), handle(0), resolutions(0), connected(false)
+    {
+        // empty
+    }
+
     ~Camera()
     {
         shutdown();
@@ -66,19 +71,24 @@ public:
 
     void shutdown()
     {
-        if (resolutions != NULL) 
+        if (resolutions != NULL) {
             free(resolutions);
+            debug << "Cleaned up resolutions." << endl;
+            resolutions = 0;
+        }
 
-        debug << "Cleaned up resolutions." << endl;
-
-        if (snap_buffer != NULL) 
+        if (snap_buffer != NULL) {
             is_FreeImageMem(handle , snap_buffer, buffer_id);
+            debug << "Cleaned up allocated snap buffer." << endl;
+            snap_buffer = 0;
+        }
 
-        debug << "Cleaned up allocated snap buffer." << endl;
-
-        is_ExitCamera(handle);
-
-        debug << "Camera closed." << endl;
+        if (connected && handle) {
+            is_ExitCamera(handle);
+            debug << "is_ExitCamera called." << endl;
+            connected = false;
+            handle = 0;
+        }
     }
 
     bool stop_video(int video_mode)
