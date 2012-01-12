@@ -46,7 +46,7 @@ def timer_forward(data):
 def timer_no_forward(_):
     timer()
 
-if args.forward:
+if args.forward in (None, True):
     timer_forward.run()
 else:
     timer_no_forward.run()
