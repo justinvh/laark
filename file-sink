@@ -24,8 +24,8 @@ parser.add_argument('-s', '--size', type=int, nargs=2,
         help='The <width> <height> of the incoming stream.')
 
 parser.add_argument('-f', '--filepath', default='/tmp/images/file-sink%d.png',
-        nargs=1, help='The path and filename to save to. See cv.LoadImage for '
-                      'the entire list of supported file formats.')
+        nargs='?', help='The path and filename to save to. See cv.LoadImage '
+                        'for the entire list of supported file formats.')
 
 parser.add_argument('-p', '--port', default=5999, type=int, nargs=1,
         help='The port to connect pull from on localhost.')
