@@ -9,7 +9,7 @@ PRG+=$(patsubst %.c,%,$(wildcard *.c))
 all: $(PRG)
 
 clean:
-	rm -f *.o $(PRG)
+	rm -f *.o *.pyc $(PRG)
 
 .PHONY: clean
 
