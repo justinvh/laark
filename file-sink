@@ -39,7 +39,7 @@ def create_image(width, height, data, channels=3):
     return img
 
 n = 0
-@pipeline(in_ports=args.port, enumerate=True)
+@pipeline(in_ports=args.port)
 def dumper(rawstream):
     global n
     img = create_image(*args.size, data=rawstream)
