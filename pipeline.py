@@ -22,8 +22,11 @@ class pipeline(object):
     def __init__(self, in_ports=None, out_port=None, ip='localhost'):
         if hasattr(in_ports, '__iter__'):
             self.in_ports = in_ports
-        else:
+        elif in_ports is not None:
             self.in_ports = [in_ports]
+        else:
+            self.in_ports = []
+
         self.out_port = out_port
         self.ip = ip
 
