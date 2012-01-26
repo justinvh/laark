@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <cstring>
 #include <cstdlib>
@@ -36,12 +37,14 @@ enum Resolution {
 class Camera {
 public:
     char* snap_buffer;
+    string json_data;
+    int json_size;
     int buffer_id;
     int mode;
     int cam_size;
     int width;
     int height;
-    int depth;
+    int channels;
     HIDS handle;
     UINT format_count;
     IMAGE_FORMAT_LIST* resolutions;
@@ -141,7 +144,7 @@ public:
         return n_ret == IS_SUCCESS;
     }
 
-    bool resolution(const unsigned int width, const unsigned int height)
+    bool resolution(const unsigned int dwidth, const unsigned int dheight)
     {
         if (!refresh_formats_available()) {
             cerr << "Camera image formats could not be generated." << endl;
@@ -152,8 +155,8 @@ public:
         bool format_found = false;
         IMAGE_FORMAT_INFO format_info;
         for (UINT i = 0; i < format_count; i++) {
-            if (resolutions->FormatInfo[i].nWidth == width &&
-                    resolutions->FormatInfo[i].nHeight == height) {
+            if (resolutions->FormatInfo[i].nWidth == dwidth &&
+                    resolutions->FormatInfo[i].nHeight == dheight) {
                 format_info = resolutions->FormatInfo[i];
                 format_found = true;
                 break;
@@ -171,17 +174,19 @@ public:
             return false;
         }
 
-        depth = 24;
-        cam_size = width * height * depth;
+        width = dwidth;
+        height = dheight;
+        channels = 3;
+        cam_size = width * height * 3;
 
-        debug << "Allocation size: " << cam_size << endl;
+        debug << "Allocation size: " << cam_size * 8 << endl;
 
         if (snap_buffer) {
             debug << "Freeing memory for camera on " << device_id  << endl;
             is_FreeImageMem(handle, snap_buffer, buffer_id);
         }
 
-        if (is_AllocImageMem(handle, width, height, depth, &snap_buffer, &buffer_id)
+        if (is_AllocImageMem(handle, width, height, channels * 8, &snap_buffer, &buffer_id)
                 != IS_SUCCESS) {
             cerr << "Error in allocating image memory on " << device_id  << endl;
             return false;
@@ -193,22 +198,58 @@ public:
             return false;
         }
         debug << "Memory set." << endl;
+        meta_update();
         return true;
+    }
+
+    void meta_update()
+    {
+        stringstream json;
+        json << "{ ";
+        json << "width: " << width << ", ";
+        json << "height: " << height;
+        json << "}";
+        json_data = json.str();
+        json_size = json_data.size();
+    }
+
+    const string& meta_data()
+    {
+        return json_data;
     }
 
     bool snap(zmq::socket_t* socket)
     {
         static int message_count = 0;
-        zmq::message_t message(cam_size);
-
+        
         if (is_FreezeVideo(handle, IS_WAIT) != IS_SUCCESS) {
             cerr << "Error in freezing a frame on " << device_id << endl;
             return false;
         }
 
-        is_CopyImageMem(handle, snap_buffer, buffer_id, (char*)message.data());
+        char* msg = new char[cam_size];
+        is_CopyImageMem(handle, snap_buffer, buffer_id, msg);
+
+        stringstream json;
+
+        // Send the header
+        json << setfill(' ') << setw(6) << width << setfill(' ') << setw(6) << height;
+        json << "3";
+
+        json << msg;
+
+        json << "{";
+        json << "\"width\":" << width << ",";
+        json << "\"height\":" << height;
+        json << "}";
+
+        string msg_json = json.str();
+
+        zmq::message_t message(msg_json.size());
+        memcpy((char*)message.data(), (void*)msg_json.c_str(), msg_json.size());
         socket->send(message);
-        debug << "[" << ++message_count << "] Message sent (" << cam_size << ") on " << device_id << endl;
+        debug << "[" << ++message_count << "] Message sent (" << msg_json.size() << ") on " << device_id << endl;
+        delete[] msg;
         return true;
     }
 };
