@@ -1,7 +1,9 @@
 #include <iostream>
+#include <sstream>
 #include <cstring>
 #include <cstdlib>
 #include <csignal>
+#include <ctype.h>
 #include <unistd.h>
 #include <ueye.h>
 #include <zmq.hpp>
@@ -139,7 +141,7 @@ public:
         return n_ret == IS_SUCCESS;
     }
 
-    bool resolution(Resolution mode)
+    bool resolution(const unsigned int width, const unsigned int height)
     {
         if (!refresh_formats_available()) {
             cerr << "Camera image formats could not be generated." << endl;
@@ -150,7 +152,8 @@ public:
         bool format_found = false;
         IMAGE_FORMAT_INFO format_info;
         for (UINT i = 0; i < format_count; i++) {
-            if (resolutions->FormatInfo[i].nFormatID == mode) {
+            if (resolutions->FormatInfo[i].nWidth == width &&
+                    resolutions->FormatInfo[i].nHeight == height) {
                 format_info = resolutions->FormatInfo[i];
                 format_found = true;
                 break;
@@ -168,8 +171,6 @@ public:
             return false;
         }
 
-        width = format_info.nWidth;
-        height = format_info.nHeight;
         depth = 24;
         cam_size = width * height * depth;
 
@@ -231,28 +232,64 @@ void sig_ttystop_handler(int sig)
 
 int main(int argc, char** argv)
 {
-    if (argc < 4) {
-        cerr << argv[0] << ": <camera> <resolution-mode[1-19]> <delay> <port>" << endl;
-        exit(1);
+    const char* usage_error = "usage: snap -c <camera> -w [width=3264] -h [height=2448] -p [port=5999]\n";
+    char arg;
+    int device=-1, width=3264, height=2448, port=5999;
+    bool width_set=false, height_set=false;
+
+    while ((arg = getopt(argc, argv, "c:w:h:p:")) != -1) {
+        switch (arg) {
+            case 'c':
+                device = atoi(optarg);
+                break;
+            case 'w':
+                width = atoi(optarg);
+                width_set = true;
+                break;
+            case 'h':
+                height = atoi(optarg);
+                height_set = true;
+                break;
+            case 'p':
+                port = atoi(optarg);
+                break;
+            case '?':
+                if (optopt == 'c') {
+                    cerr << "Option -" << optopt << " requires a camera id." << endl;
+                } else if (optopt == 'w') {
+                    cerr << "Option -" << optopt << " requires a width." << endl;
+                } else if (optopt == 'h') {
+                    cerr << "Option -" << optopt << " requires a height." << endl;
+                } else if (optopt == 'p') {
+                    cerr << "Option -" << optopt << " requires a port." << endl;
+                } else  {
+                    cerr << usage_error << endl;
+                } 
+                return 1;
+        }
     }
 
-    int devid = atoi(argv[1]);
-    int resolution = atoi(argv[2]);
-    int delay = atoi(argv[3]);
-    string tcp = "tcp://*:";
-    tcp += argv[4];
+    if (device == -1) {
+        cerr << usage_error << endl;
+        return 1;
+    }
+
+    stringstream tcp_ss;
+    tcp_ss << "tcp://*:" << port;
+
+    const string& tcp = tcp_ss.str();
 
     signal(SIGHUP, sig_exit_handler);
     signal(SIGINT, sig_exit_handler);
     signal(SIGTSTP, sig_ttystop_handler);
 
-    camera.create(devid);
+    camera.create(device);
     if (!camera.connected) {
         cerr << "Camera not connected" << endl;
         exit(2);
     }
 
-    if (!camera.resolution(Resolution(resolution))) {
+    if (!camera.resolution(width, height)) {
         cerr << "Camera failed to set resolution" << endl;
         exit(3);
     }
@@ -264,7 +301,6 @@ int main(int argc, char** argv)
     
     while (true) {
         camera.snap(&socket);
-        sleep(delay);
     }
     
     return 0;
