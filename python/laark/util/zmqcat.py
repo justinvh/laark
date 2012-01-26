@@ -9,7 +9,7 @@ environmental variable PORT
 import argparse
 import os
 import sys
-from pipeline import pipeline
+from laark.decorator import pipeline
 
 parser = argparse.ArgumentParser(
     description='Read from stdin and send contents to a ZMQ socket')

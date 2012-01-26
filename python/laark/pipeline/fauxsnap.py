@@ -9,7 +9,7 @@ contrived local data.
 '''
 
 from glob import glob
-from pipeline import pipeline
+from laark.decorator import pipeline
 import argparse
 import cv
 import itertools

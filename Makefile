@@ -1,15 +1,17 @@
-BASECFLAGS=-O2 -pedantic -Wall -Werror -I/opt/OpenCV-2.3.1/include/opencv2
+BASECFLAGS=-O2 -pedantic -Wall -Werror
 CFLAGS+=$(BASECFLAGS) -std=c99
 CXXFLAGS+=$(BASECFLAGS)
-LDFLAGS+=-lzmq -lboost_program_options -lueye_api -lm -lopencv
+LDFLAGS+=-lzmq -lboost_program_options -lueye_api -lm 
+SRC=src
 
-PRG=$(patsubst %.cc,%,$(wildcard *.cc))
-PRG+=$(patsubst %.c,%,$(wildcard *.c))
+PRG=$(patsubst %.cc,%,$(wildcard $(SRC)/*.cc))
+PRG+=$(patsubst %.c,%,$(wildcard $(SRC)/*.c))
 
 all: $(PRG)
 
 clean:
-	rm -f *.o *.pyc $(PRG)
+	find . -name "*.o" -o -name "*.pyc" | xargs rm -f
+	rm -f $(PRG)
 
 .PHONY: clean
 
