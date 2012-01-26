@@ -73,3 +73,12 @@ class pipeline(object):
         while True:
             self.pipefn()
 
+def count_calls(f):
+    def g(*args, **kwargs):
+        result = f(*args, n=g.n, **kwargs)
+        g.n += 1
+        return result
+
+    g.n = 0
+    return g
+
