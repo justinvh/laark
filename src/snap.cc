@@ -37,6 +37,7 @@ enum Resolution {
 class Camera {
 public:
     char* snap_buffer;
+    char* send_buffer;
     string json_data;
     int json_size;
     int buffer_id;
@@ -88,6 +89,10 @@ public:
             is_FreeImageMem(handle , snap_buffer, buffer_id);
             debug << "Cleaned up allocated snap buffer." << endl;
             snap_buffer = 0;
+        }
+
+        if (send_buffer != NULL) {
+            delete[] send_buffer;
         }
 
         if (connected && handle) {
@@ -186,11 +191,19 @@ public:
             is_FreeImageMem(handle, snap_buffer, buffer_id);
         }
 
+        if (send_buffer) {
+            debug << "Freeing snap buffer on " << device_id << endl;
+            delete[] snap_buffer;
+        }
+
+
         if (is_AllocImageMem(handle, width, height, channels * 8, &snap_buffer, &buffer_id)
                 != IS_SUCCESS) {
             cerr << "Error in allocating image memory on " << device_id  << endl;
             return false;
         }
+
+        send_buffer = new char[width*height*3];
 
         debug << "Setting memory for camera" << endl;
         if (is_SetImageMem(handle, snap_buffer, buffer_id) != IS_SUCCESS) {
@@ -227,8 +240,9 @@ public:
             return false;
         }
 
-        char* msg = new char[cam_size];
-        is_CopyImageMem(handle, snap_buffer, buffer_id, msg);
+        memset(send_buffer, 0, cam_size);
+        is_CopyImageMem(handle, snap_buffer, buffer_id, send_buffer);
+        send_buffer[cam_size] = '\0';
 
         stringstream json;
 
@@ -236,7 +250,7 @@ public:
         json << setfill(' ') << setw(6) << width << setfill(' ') << setw(6) << height;
         json << "3";
 
-        json << msg;
+        json << send_buffer;
 
         json << "{";
         json << "\"width\":" << width << ",";
@@ -249,7 +263,6 @@ public:
         memcpy((char*)message.data(), (void*)msg_json.c_str(), msg_json.size());
         socket->send(message);
         debug << "[" << ++message_count << "] Message sent (" << msg_json.size() << ") on " << device_id << endl;
-        delete[] msg;
         return true;
     }
 };
