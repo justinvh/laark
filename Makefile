@@ -1,15 +1,23 @@
-BASECFLAGS=-O2 -pedantic -Wall -Werror -I/opt/OpenCV-2.3.1/include/opencv2
+BASECFLAGS:=-O2 -pedantic -Wall -Werror
 CFLAGS+=$(BASECFLAGS) -std=c99
 CXXFLAGS+=$(BASECFLAGS)
-LDFLAGS+=-lzmq -lboost_program_options -lueye_api -lm -lopencv
+LDFLAGS+=-lzmq -lboost_program_options -lueye_api -lm 
+SRC:=src
 
-PRG=$(patsubst %.cc,%,$(wildcard *.cc))
-PRG+=$(patsubst %.c,%,$(wildcard *.c))
+# Files which are only linked against, not built as executables
+#BLACKLIST:=$(SRC)/foo.c
+
+PRG:=$(patsubst %.cc,%,$(filter-out $(BLACKLIST),$(wildcard $(SRC)/*.cc)))
+PRG+=$(patsubst %.c,%,$(filter-out $(BLACKLIST),$(wildcard $(SRC)/*.c)))
 
 all: $(PRG)
 
+# Example of how to add dependencies to `snap'
+#$(SRC)/snap: $(SRC)/foo.o
+
 clean:
-	rm -f *.o $(PRG)
+	find . -name "*.o" -o -name "*.pyc" | xargs rm -f
+	rm -f $(PRG)
 
 .PHONY: clean
 

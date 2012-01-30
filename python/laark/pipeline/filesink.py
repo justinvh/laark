@@ -11,7 +11,7 @@ Common supported file suffixes: png, jpeg, jpg, tiff, tif
 '''
 
 from cStringIO import StringIO
-from pipeline import pipeline
+from laark.decorator.pipeline import pipeline
 import argparse 
 import cv
 

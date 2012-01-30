@@ -1,7 +1,10 @@
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <cstring>
 #include <cstdlib>
 #include <csignal>
+#include <ctype.h>
 #include <unistd.h>
 #include <ueye.h>
 #include <zmq.hpp>
@@ -34,12 +37,15 @@ enum Resolution {
 class Camera {
 public:
     char* snap_buffer;
+    char* send_buffer;
+    string json_data;
+    int json_size;
     int buffer_id;
     int mode;
     int cam_size;
     int width;
     int height;
-    int depth;
+    int channels;
     HIDS handle;
     UINT format_count;
     IMAGE_FORMAT_LIST* resolutions;
@@ -83,6 +89,10 @@ public:
             is_FreeImageMem(handle , snap_buffer, buffer_id);
             debug << "Cleaned up allocated snap buffer." << endl;
             snap_buffer = 0;
+        }
+
+        if (send_buffer != NULL) {
+            delete[] send_buffer;
         }
 
         if (connected && handle) {
@@ -139,7 +149,7 @@ public:
         return n_ret == IS_SUCCESS;
     }
 
-    bool resolution(Resolution mode)
+    bool resolution(const unsigned int dwidth, const unsigned int dheight)
     {
         if (!refresh_formats_available()) {
             cerr << "Camera image formats could not be generated." << endl;
@@ -150,7 +160,8 @@ public:
         bool format_found = false;
         IMAGE_FORMAT_INFO format_info;
         for (UINT i = 0; i < format_count; i++) {
-            if (resolutions->FormatInfo[i].nFormatID == mode) {
+            if (resolutions->FormatInfo[i].nWidth == dwidth &&
+                    resolutions->FormatInfo[i].nHeight == dheight) {
                 format_info = resolutions->FormatInfo[i];
                 format_found = true;
                 break;
@@ -168,23 +179,31 @@ public:
             return false;
         }
 
-        width = format_info.nWidth;
-        height = format_info.nHeight;
-        depth = 24;
-        cam_size = width * height * depth;
+        width = dwidth;
+        height = dheight;
+        channels = 3;
+        cam_size = width * height * 3;
 
-        debug << "Allocation size: " << cam_size << endl;
+        debug << "Allocation size: " << cam_size * 8 << endl;
 
         if (snap_buffer) {
             debug << "Freeing memory for camera on " << device_id  << endl;
             is_FreeImageMem(handle, snap_buffer, buffer_id);
         }
 
-        if (is_AllocImageMem(handle, width, height, depth, &snap_buffer, &buffer_id)
+        if (send_buffer) {
+            debug << "Freeing snap buffer on " << device_id << endl;
+            delete[] snap_buffer;
+        }
+
+
+        if (is_AllocImageMem(handle, width, height, channels * 8, &snap_buffer, &buffer_id)
                 != IS_SUCCESS) {
             cerr << "Error in allocating image memory on " << device_id  << endl;
             return false;
         }
+
+        send_buffer = new char[width*height*3];
 
         debug << "Setting memory for camera" << endl;
         if (is_SetImageMem(handle, snap_buffer, buffer_id) != IS_SUCCESS) {
@@ -192,22 +211,58 @@ public:
             return false;
         }
         debug << "Memory set." << endl;
+        meta_update();
         return true;
+    }
+
+    void meta_update()
+    {
+        stringstream json;
+        json << "{ ";
+        json << "width: " << width << ", ";
+        json << "height: " << height;
+        json << "}";
+        json_data = json.str();
+        json_size = json_data.size();
+    }
+
+    const string& meta_data()
+    {
+        return json_data;
     }
 
     bool snap(zmq::socket_t* socket)
     {
         static int message_count = 0;
-        zmq::message_t message(cam_size);
-
+        
         if (is_FreezeVideo(handle, IS_WAIT) != IS_SUCCESS) {
             cerr << "Error in freezing a frame on " << device_id << endl;
             return false;
         }
 
-        is_CopyImageMem(handle, snap_buffer, buffer_id, (char*)message.data());
+        memset(send_buffer, 0, cam_size);
+        is_CopyImageMem(handle, snap_buffer, buffer_id, send_buffer);
+        send_buffer[cam_size] = '\0';
+
+        stringstream json;
+
+        // Send the header
+        json << setfill(' ') << setw(6) << width << setfill(' ') << setw(6) << height;
+        json << "3";
+
+        json << send_buffer;
+
+        json << "{";
+        json << "\"width\":" << width << ",";
+        json << "\"height\":" << height;
+        json << "}";
+
+        string msg_json = json.str();
+
+        zmq::message_t message(msg_json.size());
+        memcpy((char*)message.data(), (void*)msg_json.c_str(), msg_json.size());
         socket->send(message);
-        debug << "[" << ++message_count << "] Message sent (" << cam_size << ") on " << device_id << endl;
+        debug << "[" << ++message_count << "] Message sent (" << msg_json.size() << ") on " << device_id << endl;
         return true;
     }
 };
@@ -231,28 +286,64 @@ void sig_ttystop_handler(int sig)
 
 int main(int argc, char** argv)
 {
-    if (argc < 4) {
-        cerr << argv[0] << ": <camera> <resolution-mode[1-19]> <delay> <port>" << endl;
-        exit(1);
+    const char* usage_error = "usage: snap -c <camera> -w [width=3264] -h [height=2448] -p [port=5999]\n";
+    char arg;
+    int device=-1, width=3264, height=2448, port=5999;
+    bool width_set=false, height_set=false;
+
+    while ((arg = getopt(argc, argv, "c:w:h:p:")) != -1) {
+        switch (arg) {
+            case 'c':
+                device = atoi(optarg);
+                break;
+            case 'w':
+                width = atoi(optarg);
+                width_set = true;
+                break;
+            case 'h':
+                height = atoi(optarg);
+                height_set = true;
+                break;
+            case 'p':
+                port = atoi(optarg);
+                break;
+            case '?':
+                if (optopt == 'c') {
+                    cerr << "Option -" << optopt << " requires a camera id." << endl;
+                } else if (optopt == 'w') {
+                    cerr << "Option -" << optopt << " requires a width." << endl;
+                } else if (optopt == 'h') {
+                    cerr << "Option -" << optopt << " requires a height." << endl;
+                } else if (optopt == 'p') {
+                    cerr << "Option -" << optopt << " requires a port." << endl;
+                } else  {
+                    cerr << usage_error << endl;
+                } 
+                return 1;
+        }
     }
 
-    int devid = atoi(argv[1]);
-    int resolution = atoi(argv[2]);
-    int delay = atoi(argv[3]);
-    string tcp = "tcp://*:";
-    tcp += argv[4];
+    if (device == -1) {
+        cerr << usage_error << endl;
+        return 1;
+    }
+
+    stringstream tcp_ss;
+    tcp_ss << "tcp://*:" << port;
+
+    const string& tcp = tcp_ss.str();
 
     signal(SIGHUP, sig_exit_handler);
     signal(SIGINT, sig_exit_handler);
     signal(SIGTSTP, sig_ttystop_handler);
 
-    camera.create(devid);
+    camera.create(device);
     if (!camera.connected) {
         cerr << "Camera not connected" << endl;
         exit(2);
     }
 
-    if (!camera.resolution(Resolution(resolution))) {
+    if (!camera.resolution(width, height)) {
         cerr << "Camera failed to set resolution" << endl;
         exit(3);
     }
@@ -264,7 +355,6 @@ int main(int argc, char** argv)
     
     while (true) {
         camera.snap(&socket);
-        sleep(delay);
     }
     
     return 0;
