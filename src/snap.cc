@@ -217,10 +217,12 @@ public:
 
     void meta_update()
     {
+        // JSON
         stringstream json;
-        json << "{ ";
-        json << "width: " << width << ", ";
-        json << "height: " << height;
+        json << "{";
+        json << "\"width\":" << width << ",";
+        json << "\"height\":" << height << ",";
+        json << "\"channels\":" << 3;
         json << "}";
         json_data = json.str();
         json_size = json_data.size();
@@ -244,20 +246,12 @@ public:
         is_CopyImageMem(handle, snap_buffer, buffer_id, send_buffer);
         send_buffer[cam_size] = '\0';
 
-        stringstream json;
-
         // Send the header
-        json << setfill(' ') << setw(6) << width << setfill(' ') << setw(6) << height;
-        json << "3";
+        stringstream header;
+        header << setfill(' ') << setw(10) << json_size << json_data;
+        header << send_buffer;
 
-        json << send_buffer;
-
-        json << "{";
-        json << "\"width\":" << width << ",";
-        json << "\"height\":" << height;
-        json << "}";
-
-        string msg_json = json.str();
+        const string& msg_json = header.str();
 
         zmq::message_t message(msg_json.size());
         memcpy((char*)message.data(), (void*)msg_json.c_str(), msg_json.size());

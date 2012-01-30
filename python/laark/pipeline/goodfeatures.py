@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(
         description='Reads a RAW BGR image and finds '
                     'interesting subrects to forward')
 
-parser.add_argument('-n', '--num-features', type=int, default=10, nargs=1,
+parser.add_argument('-n', '--num-features', type=int, default=10, nargs='?',
         help='The number of features to extract from the incoming image')
 
 parser.add_argument('-i', '--in-port', type=int,
@@ -33,14 +33,15 @@ def worker(data):
     buf = StringIO(data)
     raw = buf.read()
 
-    width = int(raw[:6].lstrip())
-    height = int(raw[6:12].lstrip())
-    channels = int(raw[12:13].lstrip())
-
-    meta = json.loads(raw[13+width*height*channels:])
+    # 4-byte integer: 4294967295
+    header_size = int(raw[:10].lstrip())
+    meta = json.loads(raw[10:10+header_size])
+    width = meta['width']
+    height = meta['height']
+    channels = meta['channels']
 
     img = cv.CreateImageHeader((width, height), cv.IPL_DEPTH_8U, channels)
-    cv.SetData(img, raw[13:width*height*channels])
+    cv.SetData(img, raw[10+header_size:])
     gs = cv.CreateImage((width, height), 8, 1)
     cv.CvtColor(img, gs, cv.CV_BGR2GRAY)
     
