@@ -1,3 +1,4 @@
+# coding: utf-8
 '''
 good-features --
 Reads a RAW BGR image via a PULL socket and uses the
@@ -7,9 +8,11 @@ to send over a PUSH socket.
 
 from cStringIO import StringIO
 from laark.decorator.pipeline import pipeline
+from itertools import izip, cycle
 import argparse
 import cv
 import json
+import os
 import sys
 
 parser = argparse.ArgumentParser(
@@ -47,14 +50,41 @@ def worker(data):
     eigimg = cv.CreateMat(gs.width, gs.height, cv.CV_8UC1)
     tmpimg = cv.CreateMat(gs.width, gs.height, cv.CV_8UC1)
 
-    print '\nnew image'
-    for x, y in cv.GoodFeaturesToTrack(gs, eigimg, tmpimg, args.num_features, 0.02, 1.0, useHarris=True):
-        print 'good feature at', x, y
-        sub = cv.GetSubRect(img, (int(x), int(y), 128, 128))
+    bound = 512
+    size = cv.GetSize(img)
+    print '\nreceived %s image' % (size,)
+    for ((x, y), i) in izip(cv.GoodFeaturesToTrack(gs, eigimg, tmpimg, args.num_features, 0.02, 1.0, useHarris=True), cycle(range(args.num_features))):
+        x, y = int(x), int(y)
+        # TODO(cwvh): This is fast, dirty, and crude. Moving by powers of two
+        # could potentially throw away a lot of information.
+        #
+        # Take a subrectangle which is centered at (x,y) with a bounding
+        # box which is (x±bound,y±bound). If any edge of the box is outside of
+        # the original image, reduce the bounding box size by powers of two to 
+        # create a tight bounding box.
+        tightbound = bound
+        minx, miny = x-bound, y-bound
+        maxx, maxy = x+bound, y+bound
+        while minx < 0 or miny < 0 or maxx > size[0] or maxy > [1]:
+            # An edge exceeded the image bounds. Calculate new bounds with
+            # a smaller bounding box (tightbound) and check the coordinates again.
+            tightbound /= 2
+            minx, miny = x-tightbound, y-tightbound
+            maxx, maxy = x+tightbound, y+tightbound
 
-        filename = '/tmp/feature-%d-%d.png' % (x, y)
+        if tightbound < 8:
+            print 'bounding-box less than one; skipping feature'
+            continue
+
+        bounds = (x, y, tightbound, tightbound)
+        print '%d feature=%s,\tsubrect=%s' % (i, (x,y), bounds)
+        sub = cv.GetSubRect(img, bounds)
+        filename = '/tmp/feature-%d.png' % i
+        # cv.SaveImage won't overwrite files. Do it the hard way.
+        if os.path.exists(filename):
+            os.unlink(filename)
         cv.SaveImage(filename, sub)
 
-    return "asdf"
+    return "TODO: allow pipeline yields"
 
 worker.run()
