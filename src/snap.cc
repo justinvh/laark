@@ -16,7 +16,8 @@ using namespace std;
 // Standard resolutions, if you need more then
 // specify: http://www.ids-imaging.de/frontend/files/uEyeManuals/Manual_eng/uEye_Manual/index.html?is_imageformat.html
 enum Resolution {
-    R_8M = 1,
+    R_10M = 0,
+    R_8M,
     R_8M_3_2,
     R_8M_16_9,
     R_5M,
@@ -38,8 +39,9 @@ class Camera {
 public:
     char* snap_buffer;
     char* send_buffer;
+    size_t send_buffer_size;
     string json_data;
-    int json_size;
+    unsigned int json_size;
     int buffer_id;
     int mode;
     int cam_size;
@@ -203,7 +205,7 @@ public:
             return false;
         }
 
-        send_buffer = new char[width*height*3];
+        reallocate_send_buffer();
 
         debug << "Setting memory for camera" << endl;
         if (is_SetImageMem(handle, snap_buffer, buffer_id) != IS_SUCCESS) {
@@ -220,13 +222,20 @@ public:
         // JSON
         stringstream json;
         json << "{";
-        json << "\"width\":" << width << ",";
-        json << "\"height\":" << height << ",";
-        json << "\"channels\":" << 3;
+        json << "\"width\": " << width << ",";
+        json << "\"height\": " << height << ",";
+        json << "\"channels\": " << 3;
         json << "}";
         json_data = json.str();
         json_size = json_data.size();
     }
+
+    void reallocate_send_buffer() {
+        meta_update();
+        send_buffer_size = sizeof(json_size)+json_size+width*height*3;
+        send_buffer = new char[send_buffer_size];
+    }
+
 
     const string& meta_data()
     {
@@ -242,21 +251,20 @@ public:
             return false;
         }
 
-        memset(send_buffer, 0, cam_size);
-        is_CopyImageMem(handle, snap_buffer, buffer_id, send_buffer);
-        send_buffer[cam_size] = '\0';
+        memset(send_buffer, '\0', send_buffer_size);
+        memcpy(send_buffer, &json_size, sizeof(json_size));
+        memcpy(send_buffer+sizeof(json_size), json_data.c_str(), json_size);
+        debug << json_size << " json data: " << send_buffer << " "
+              << json_data.c_str() << endl;
+        is_CopyImageMem(handle, snap_buffer, buffer_id, 
+                send_buffer + sizeof(json_size) + json_size);
 
         // Send the header
-        stringstream header;
-        header << setfill(' ') << setw(10) << json_size << json_data;
-        header << send_buffer;
-
-        const string& msg_json = header.str();
-
-        zmq::message_t message(msg_json.size());
-        memcpy((char*)message.data(), (void*)msg_json.c_str(), msg_json.size());
+        zmq::message_t message(send_buffer_size);
+        memcpy((char*)message.data(), (void*)send_buffer, send_buffer_size);
         socket->send(message);
-        debug << "[" << ++message_count << "] Message sent (" << msg_json.size() << ") on " << device_id << endl;
+        debug << "[" << ++message_count << "] Message sent (" 
+              << send_buffer_size << ") on " << device_id << endl;
         return true;
     }
 };
@@ -275,7 +283,8 @@ void sig_exit_handler(int sig)
 void sig_ttystop_handler(int sig)
 {
     // alert the user to take more appropriate action
-    cerr << "SIGTSTP is disabled, use SIGHUP or SIGINT to terminate" << endl;
+    cerr << "SIGTSTP is disabled, use SIGHUP or SIGINT to terminate" 
+         << endl;
 }
 
 int main(int argc, char** argv)
@@ -303,13 +312,17 @@ int main(int argc, char** argv)
                 break;
             case '?':
                 if (optopt == 'c') {
-                    cerr << "Option -" << optopt << " requires a camera id." << endl;
+                    cerr << "Option -" << optopt 
+                         << " requires a camera id." << endl;
                 } else if (optopt == 'w') {
-                    cerr << "Option -" << optopt << " requires a width." << endl;
+                    cerr << "Option -" << optopt 
+                         << " requires a width." << endl;
                 } else if (optopt == 'h') {
-                    cerr << "Option -" << optopt << " requires a height." << endl;
+                    cerr << "Option -" << optopt 
+                         << " requires a height." << endl;
                 } else if (optopt == 'p') {
-                    cerr << "Option -" << optopt << " requires a port." << endl;
+                    cerr << "Option -" << optopt 
+                         << " requires a port." << endl;
                 } else  {
                     cerr << usage_error << endl;
                 } 

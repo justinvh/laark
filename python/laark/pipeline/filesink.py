@@ -46,4 +46,6 @@ def dumper(rawstream):
     cv.SaveImage(args.filepath % n, img)
     n += 1
 
+print "Filepath: ", args.filepath
+print args.size
 dumper.run()
