@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Invoke snap services on specified ports. Typical usage:
+#
+#   $ run-cams
+#
+# Starts two `snap' services running on tcp ports 5999 and 6000.
+#
+#   $ run-cams 5888 6888
+#
+# Same as above except serving on tcp ports 5888 and 6888.
+
+# The camera id values should not need to be munged. The values for these
+# can be found by running `/usr/local/share/ueye/bin/ueyesetid'.
+leftcamid=1
+rightcamid=2
+
+case "x$1" in
+xh|xhelp|x-h|x--help|x--h)
+    echo usage: `basename $0` [left-cam-port] [right-cam-port] 1>&2
+    exit 1
+    ;;
+esac
+
+case "x$LAARK" in
+x)
+    echo \$LAARK not found. Have you sourced env.bash? 1>&2
+    exit 2
+    ;;
+esac
+
+leftcamport=${1:-5999}
+rightcamport=${2:-6000}
+
+if [ ! -x $LAARK/src/snap ]; then
+    echo Looks like you have not built snap. Let me do that for you...
+    (cd $LAARK; make) 2>&1 | awk -f $LAARK/share/buildsum.awk
+fi
+
+leftcampid=
+rightcampid=
+
+trap cleanup 1 2 3 6 15
+
+cleanup() {
+    echo Trying to do graceful cleanup...
+    if [ "x$leftcampid" != "x" ]; then
+        echo "kill -1 $leftcampid"
+    fi
+    if [ "x$rightcampid" != "x" ]; then
+        echo "kill -1 $rightcampid"
+    fi
+    exit 0  # TODO(cwvh): should this be 0?
+}
+
+# Don't run this until the next block is ... blocked.
+exit 42
+
+echo Launching snap services on $leftcamport and $rightcamport...
+(
+$LAARK/src/snap -c 1 -p $leftcamport &
+leftcampid=$$
+$LAARK/src/snap -c 2 -p $rightcamport &
+rightcampid=$$
+# need to block here.
+) 2>&1 | tee snap.runlog | awk -f $LAARK/share/snapsum.awk
+
+exit 0
