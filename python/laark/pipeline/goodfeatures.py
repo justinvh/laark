@@ -34,7 +34,6 @@ print 'listening on', args.in_port, 'and pushing to', args.out_port, '...'
 
 @pipeline(in_ports=args.in_port, out_port=args.out_port)
 def worker(data):
-    print "Reading..."
     buf = StringIO(data)
     raw = buf.read()
 
@@ -53,18 +52,28 @@ def worker(data):
     img = cv.CreateImageHeader((width, height), cv.IPL_DEPTH_8U, channels)
     cv.SetData(img, raw[header_size+4:])
     gs = cv.CreateImage((width, height), 8, 1)
+    gsc = cv.CreateImage((width, height), 8, 1)
     cv.CvtColor(img, gs, cv.CV_BGR2GRAY)
+    cv.CvtColor(img, gsc, cv.CV_BGR2GRAY)
     
     eigimg = cv.CreateMat(gs.width, gs.height, cv.CV_8UC1)
     tmpimg = cv.CreateMat(gs.width, gs.height, cv.CV_8UC1)
 
-    cv.SaveImage('/tmp/source.png', gs)
-
     bound = 512
     size = cv.GetSize(img)
     print '\nreceived %s image' % (size,)
-    for ((x, y), i) in izip(cv.GoodFeaturesToTrack(gs, eigimg, tmpimg, args.num_features, 0.02, 1.0, useHarris=True), cycle(range(args.num_features))):
+    for ((x, y), i) in izip(
+            cv.GoodFeaturesToTrack(
+                gs,                 # image
+                eigimg,             # eigimage
+                tmpimg,             # tempimage
+                args.num_features,  # num of features
+                qualityLevel=0.025,   # multiplier for max/min eigenvalue
+                minDistance=20.0,
+                useHarris=True),   #
+            cycle(range(args.num_features))):
         x, y = int(x), int(y)
+        cv.Circle(gsc, (x, y), 8, (255, 0, 0), 2, 8, 0)
         # TODO(cwvh): This is fast, dirty, and crude. Moving by powers of two
         # could potentially throw away a lot of information.
         #
@@ -86,14 +95,20 @@ def worker(data):
             print 'bounding-box less than one; skipping feature'
             continue
 
-        bounds = (x, y, tightbound, tightbound)
-        print '%d feature=%s,\tsubrect=%s' % (i, (x,y), bounds)
-        sub = cv.GetSubRect(img, bounds)
-        filename = '/tmp/feature-%d.png' % i
-        # cv.SaveImage won't overwrite files. Do it the hard way.
-        if os.path.exists(filename):
-            os.unlink(filename)
+        try:
+            bounds = (x, y, tightbound, tightbound)
+            print '%d feature=%s,\tsubrect=%s' % (i, (x,y), bounds)
+            sub = cv.GetSubRect(img, bounds)
+            filename = 'feature-%d.png' % i
+            # cv.SaveImage won't overwrite files. Do it the hard way.
+            if os.path.exists(filename):
+                os.unlink(filename)
+            cv.SaveImage(filename, sub)
+        except Exception, e:
+            print e
 
+    cv.SaveImage('source.png', gsc)
     return "TODO: allow pipeline yields"
 
+args.num_features = int(args.num_features[0])
 worker.run()

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <title>Shows the last 10</title>
+    <script src='http://code.jquery.com/jquery-1.7.1.min.js'></script>
+  </head>
+  <body>
+    <h1>Features (10)</h1>
+    <div id='images'></div>
+
+    <h1>Source Image</h1>
+    <img src='source.png'>
+
+    <script>
+      for (var i = 0; i < 10; i++) {
+        var src = 'feature-' + i + '.png'
+        $('<img></img>').attr({'src': src, 'height': 64, 'width': 64}).appendTo('#images');
+      }
+      var $images = $('img');
+      $images.each(function () {
+        $(this).attr('orig', $(this).attr('src'));
+      });
+      function update() {
+        var d = new Date();
+        $images.each(function () {
+          var orig = $(this).attr('orig');
+          $(this).attr('src', orig + '?time=' + d.getTime());
+        });
+        setTimeout(update, 500);
+      }
+      update();
+    </script>
+
+    </body>
+</html>
+  
